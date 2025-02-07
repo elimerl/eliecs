@@ -1,0 +1,3 @@
+[workspace]
+members = ["eliecs", "eliecs_macros"]
+resolver = "2"
