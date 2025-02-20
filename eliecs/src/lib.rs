@@ -8,6 +8,7 @@ use std::{
 pub use pool::Pool;
 
 pub use eliecs_macros::components;
+use serde::{de::Visitor, ser::SerializeTuple};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Entity {
@@ -31,6 +32,48 @@ impl Entity {
     }
     pub const fn to_bits(&self) -> NonZeroU64 {
         unsafe { NonZeroU64::new_unchecked((self.version.get() as u64) << 32 | (self.id as u64)) }
+    }
+}
+
+impl serde::Serialize for Entity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut tup = serializer.serialize_tuple(2)?;
+        tup.serialize_element(&self.id)?;
+        tup.serialize_element(&self.version)?;
+        tup.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Entity {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct EntityVisitor;
+        impl<'de> Visitor<'de> for EntityVisitor {
+            type Value = Entity;
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let id = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                let version = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+
+                Ok(Entity { id, version })
+            }
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a tuple of (u32 id, u32 version)")
+            }
+        }
+        deserializer.deserialize_tuple(2, EntityVisitor)
     }
 }
 

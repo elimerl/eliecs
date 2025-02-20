@@ -23,6 +23,7 @@ impl Parse for ComponentDefs {
                 );
             }
         }
+        s.sort_by_key(|v| v.ident.to_string());
         Ok(ComponentDefs { s })
     }
 }
@@ -73,7 +74,7 @@ pub fn components(input: TokenStream) -> TokenStream {
                 &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
                 ident.span(),
             );
-            quote! { #renamed_ident: Pool<#ident> }
+            quote! { #renamed_ident: UnsafeCell<Pool<#ident>> }
         })
         .collect::<Vec<_>>();
 
@@ -86,54 +87,273 @@ pub fn components(input: TokenStream) -> TokenStream {
                 &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
                 ident.span(),
             );
-            quote! { #renamed_ident: Pool::new() }
+            quote! { #renamed_ident: UnsafeCell::new(Pool::new()) }
+        })
+        .collect::<Vec<_>>();
+
+    let ecs_fields_deser = components
+        .s
+        .iter()
+        .map(|v| {
+            let ident = &v.ident;
+            let renamed_ident = proc_macro2::Ident::new(
+                &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
+                ident.span(),
+            );
+            quote! { #renamed_ident }
+        })
+        .collect::<Vec<_>>();
+
+    let ecs_deser = components
+        .s
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let ident = &v.ident;
+            let renamed_ident = proc_macro2::Ident::new(
+                &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
+                ident.span(),
+            );
+            let len = proc_macro2::Literal::usize_suffixed(i + 2);
+
+            quote! { let #renamed_ident = UnsafeCell::new(
+                seq.next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(#i, &self))?,
+            ); }
+        })
+        .collect::<Vec<_>>();
+
+    let ecs_ser = components
+        .s
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let ident = &v.ident;
+            let renamed_ident = proc_macro2::Ident::new(
+                &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
+                ident.span(),
+            );
+
+            quote! {
+                s.serialize_element(unsafe { &*(self.#renamed_ident.get()) })?;
+            }
+        })
+        .collect::<Vec<_>>();
+
+    let ecs_per_component_methods = components.s.iter().map(|v| {
+        let ident = &v.ident;
+        let renamed_ident = proc_macro2::Ident::new(
+            &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
+            ident.span(),
+        );
+        let renamed_ident_mut = proc_macro2::Ident::new(
+            &((ident.to_string().strip_prefix("C").unwrap()).to_snake_case() + "_mut"),
+            ident.span(),
+        );
+        let renamed_ident_mut_unwrap = proc_macro2::Ident::new(
+            &((ident.to_string().strip_prefix("C").unwrap()).to_snake_case() + "_mut_unwrap"),
+            ident.span(),
+        );
+        let query_renamed_ident = proc_macro2::Ident::new(
+            &("query_".to_string()
+                + &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case()),
+            ident.span(),
+        );
+        let query_renamed_ident_mut = proc_macro2::Ident::new(
+            &("query_".to_string()
+                + &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case()
+                + "_mut"),
+            ident.span(),
+        );
+
+        let error_message =
+            proc_macro2::Literal::string(&format!("expected entity to have component {}", ident));
+
+        quote! {
+            pub fn #renamed_ident(&self, id: u32) -> Option<&CPosition> {
+                unsafe { (*(self.#renamed_ident.get())).get(id) }
+            }
+
+            pub fn #renamed_ident_mut(&self, id: u32) -> Option<&mut CPosition> {
+                unsafe { (*(self.#renamed_ident.get())).get_mut(id) }
+            }
+
+            pub fn #renamed_ident_mut_unwrap(&self, id: u32) -> &mut CPosition {
+                unsafe { (*(self.#renamed_ident.get())).get_mut(id) }
+                    .expect(#error_message)
+            }
+
+            pub fn #query_renamed_ident(&self) -> impl Iterator<Item = (u32, &CPosition)> {
+                unsafe { &mut *(self.#renamed_ident.get()) }.iter()
+            }
+            pub fn #query_renamed_ident_mut(&self) -> impl Iterator<Item = (u32, &mut CPosition)> {
+                unsafe { &mut *(self.#renamed_ident.get()) }.iter_mut()
+            }
+        }
+    });
+
+    let ecs_tuple_size = proc_macro2::Literal::usize_suffixed(components.s.len() + 2);
+
+    let component_types = components
+        .s
+        .iter()
+        .map(|v| {
+            let ident = &v.ident;
+            quote! { #ident }
         })
         .collect::<Vec<_>>();
 
     quote! {
-        #tokens
+        use eliecs::{Entity, Pool};
+        use serde::{
+            de::Visitor,
+            ser::{SerializeStruct, SerializeTuple},
+            Deserialize, Serialize,
+        };
 
-        #[derive(Default, Debug)]
-        struct FatEntity {
-            #(#fat_fields),*
-        }
+            #tokens
 
-        impl FatEntity {
-            pub fn new() -> Self {
-                Self::default()
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+    enum ComponentType {
+        #(#component_types),*
+    }
+
+            #[derive(Default, Debug)]
+            struct FatEntity {
+                #(#fat_fields),*
             }
 
-            #(#fat_methods)*
-        }
-
-        struct ECS {
-            entities: Vec<eliecs::Entity>,
-            destroyed: Option<Entity>,
-            #(#ecs_fields),*
-        }
-
-        impl ECS {
-            pub fn new() -> Self {
-                Self {
-                    #(#ecs_fields_init),*
+            impl FatEntity {
+                pub fn new() -> Self {
+                    Self::default()
                 }
-            }
-            pub fn spawn(&mut self, e: FatEntity) -> eliecs::Entity {
-                let e: eliecs::Entity;
-                if let Some(d) = self.destroyed {
-                    let idx = d;
 
-                } else {
-                    e = eliecs::Entity::new(self.entities.len() as u32, std::num::NonZeroU32::MIN);
-                    self.entities.push(
-                        e
-                    );
-                }
-                eliecs::Entity::new(0, std::num::NonZeroU32::MIN)
+                #(#fat_methods)*
             }
 
-            pub fn despawn
+            struct Ecs {
+                existence: Pool<std::num::NonZeroU32>,
+                free_list: Vec<Entity>,
+                        #(#ecs_fields),*
+            }
+
+    #[allow(clippy::mut_from_ref)]
+    impl Ecs {
+        pub fn new() -> Self {
+            Self {
+                existence: Pool::new(),
+                free_list: Vec::new(),
+                #(#ecs_fields_init),*
+            }
+        }
+        pub fn is_alive(&self, e: eliecs::Entity) -> bool {
+            self.existence.get(e.id).copied() == Some(e.version)
+        }
+        pub fn get_entity_from_id(&self, id: u32) -> Option<std::num::NonZeroU32> {
+            self.existence.get(id).copied()
+        }
+        pub fn spawn(&mut self, data: FatEntity) -> eliecs::Entity {
+            let e: eliecs::Entity;
+            if let Some(v) = self.free_list.pop() {
+                e = v;
+            } else {
+                e = eliecs::Entity::new(self.existence.len(), std::num::NonZeroU32::MIN);
+            }
+            self.existence.insert(e.id, e.version);
+
+            if let Some(v) = data.position {
+                self.position.get_mut().insert(e.id, v);
+            }
+
+            if let Some(v) = data.name {
+                self.name.get_mut().insert(e.id, v);
+            }
+
+            e
+        }
+
+        pub fn despawn(&mut self, e: eliecs::Entity) {
+            self.existence.remove(e.id);
+
+            self.position.get_mut().remove(e.id);
+            self.name.get_mut().remove(e.id);
+
+            let mut v = e;
+            v.version = if let Some(v) = v.version.checked_add(1) {
+                v
+            } else {
+                std::num::NonZeroU32::MIN
+            };
+            self.free_list.push(v);
+        }
+
+        pub fn position(&self, id: u32) -> Option<&CPosition> {
+            unsafe { (*(self.position.get())).get(id) }
+        }
+
+        pub fn position_mut(&self, id: u32) -> Option<&mut CPosition> {
+            unsafe { (*(self.position.get())).get_mut(id) }
+        }
+
+        pub fn position_mut_unwrap(&self, id: u32) -> &mut CPosition {
+            unsafe { (*(self.position.get())).get_mut(id) }
+                .expect("expected entity to have component CPosition")
+        }
+
+        pub fn query_position(&self) -> impl Iterator<Item = (u32, &CPosition)> {
+            unsafe { &mut *(self.position.get()) }.iter()
+        }
+        pub fn query_position_mut(&self) -> impl Iterator<Item = (u32, &mut CPosition)> {
+            unsafe { &mut *(self.position.get()) }.iter_mut()
         }
     }
+
+    impl serde::Serialize for Ecs {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            let mut s = serializer.serialize_tuple(#ecs_tuple_size)?;
+            s.serialize_element(&self.existence)?;
+            s.serialize_element(&self.free_list)?;
+            #(#ecs_ser)*
+            s.end()
+        }
+    }
+    impl<'de> serde::Deserialize<'de> for Ecs {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            struct ECSVisitor;
+            impl<'de> Visitor<'de> for ECSVisitor {
+                type Value = Ecs;
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: serde::de::SeqAccess<'de>,
+                {
+                    let existence = seq
+                        .next_element()?
+                        .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                    let free_list = seq
+                        .next_element()?
+                        .ok_or_else(|| serde::de::Error::invalid_length(1, &self))?;
+                    #(#ecs_deser)*
+
+                    Ok(Ecs {
+                        existence,
+                        free_list,
+                        #(#ecs_fields_deser),*
+                    })
+                }
+
+                fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    formatter.write_str("a serialized ECS")
+                }
+            }
+            deserializer.deserialize_tuple(4, ECSVisitor)
+        }
+    }
+        }
     .into()
 }
