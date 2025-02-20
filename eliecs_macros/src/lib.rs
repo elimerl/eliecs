@@ -165,29 +165,46 @@ pub fn components(input: TokenStream) -> TokenStream {
                 + "_mut"),
             ident.span(),
         );
+        let add_renamed_ident = proc_macro2::Ident::new(
+            &("add_".to_string() + &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case()),
+            ident.span(),
+        );
+        let remove_renamed_ident = proc_macro2::Ident::new(
+            &("remove_".to_string()
+                + &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case()),
+            ident.span(),
+        );
 
         let error_message =
             proc_macro2::Literal::string(&format!("expected entity to have component {}", ident));
 
         quote! {
-            pub fn #renamed_ident(&self, id: u32) -> Option<&CPosition> {
+            pub fn #renamed_ident(&self, id: u32) -> Option<&#ident> {
                 unsafe { (*(self.#renamed_ident.get())).get(id) }
             }
 
-            pub fn #renamed_ident_mut(&self, id: u32) -> Option<&mut CPosition> {
+            pub fn #renamed_ident_mut(&self, id: u32) -> Option<&mut #ident> {
                 unsafe { (*(self.#renamed_ident.get())).get_mut(id) }
             }
 
-            pub fn #renamed_ident_mut_unwrap(&self, id: u32) -> &mut CPosition {
+            pub fn #renamed_ident_mut_unwrap(&self, id: u32) -> &mut #ident {
                 unsafe { (*(self.#renamed_ident.get())).get_mut(id) }
                     .expect(#error_message)
             }
 
-            pub fn #query_renamed_ident(&self) -> impl Iterator<Item = (u32, &CPosition)> {
+            pub fn #query_renamed_ident(&self) -> impl Iterator<Item = (u32, &#ident)> {
                 unsafe { &mut *(self.#renamed_ident.get()) }.iter()
             }
-            pub fn #query_renamed_ident_mut(&self) -> impl Iterator<Item = (u32, &mut CPosition)> {
+            pub fn #query_renamed_ident_mut(&self) -> impl Iterator<Item = (u32, &mut #ident)> {
                 unsafe { &mut *(self.#renamed_ident.get()) }.iter_mut()
+            }
+
+            pub fn #add_renamed_ident(&self, id: u32, v: #ident) -> bool {
+                unsafe { &mut *(self.#renamed_ident.get()) }.insert(id, v)
+            }
+
+            pub fn #remove_renamed_ident(&self, id: u32) {
+                unsafe { &mut *(self.#renamed_ident.get()) }.remove(id);
             }
         }
     });
@@ -287,25 +304,7 @@ pub fn components(input: TokenStream) -> TokenStream {
             self.free_list.push(v);
         }
 
-        pub fn position(&self, id: u32) -> Option<&CPosition> {
-            unsafe { (*(self.position.get())).get(id) }
-        }
-
-        pub fn position_mut(&self, id: u32) -> Option<&mut CPosition> {
-            unsafe { (*(self.position.get())).get_mut(id) }
-        }
-
-        pub fn position_mut_unwrap(&self, id: u32) -> &mut CPosition {
-            unsafe { (*(self.position.get())).get_mut(id) }
-                .expect("expected entity to have component CPosition")
-        }
-
-        pub fn query_position(&self) -> impl Iterator<Item = (u32, &CPosition)> {
-            unsafe { &mut *(self.position.get()) }.iter()
-        }
-        pub fn query_position_mut(&self) -> impl Iterator<Item = (u32, &mut CPosition)> {
-            unsafe { &mut *(self.position.get()) }.iter_mut()
-        }
+        #(#ecs_per_component_methods)*
     }
 
     impl serde::Serialize for Ecs {

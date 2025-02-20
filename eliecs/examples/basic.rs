@@ -42,6 +42,12 @@ fn main() {
             })
             .name(CName("hello world".to_string())),
     );
+    dbg!(ecs.rot(e.id));
+    ecs.add_rot(e.id, CRot(100.0));
+    dbg!(ecs.rot(e.id));
+    // ecs.remove_rot(e.id);
+    dbg!(ecs.rot(e.id));
+
     // dbg!(ecs.destroyed);
     for (id, v) in ecs.query_position_mut() {
         v.x += 1.0;
