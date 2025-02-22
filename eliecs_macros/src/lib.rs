@@ -74,7 +74,7 @@ pub fn components(input: TokenStream) -> TokenStream {
                 &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
                 ident.span(),
             );
-            quote! { #renamed_ident: UnsafeCell<Pool<#ident>> }
+            quote! { #renamed_ident: std::cell::UnsafeCell<Pool<#ident>> }
         })
         .collect::<Vec<_>>();
 
@@ -87,7 +87,7 @@ pub fn components(input: TokenStream) -> TokenStream {
                 &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
                 ident.span(),
             );
-            quote! { #renamed_ident: UnsafeCell::new(Pool::new()) }
+            quote! { #renamed_ident: std::cell::UnsafeCell::new(Pool::new()) }
         })
         .collect::<Vec<_>>();
 
@@ -116,7 +116,7 @@ pub fn components(input: TokenStream) -> TokenStream {
             );
             let len = proc_macro2::Literal::usize_suffixed(i + 2);
 
-            quote! { let #renamed_ident = UnsafeCell::new(
+            quote! { let #renamed_ident = std::cell::UnsafeCell::new(
                 seq.next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(#i, &self))?,
             ); }
@@ -225,12 +225,11 @@ pub fn components(input: TokenStream) -> TokenStream {
         use serde::{
             de::Visitor,
             ser::{SerializeStruct, SerializeTuple},
-            Deserialize, Serialize,
         };
 
             #tokens
 
-            #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+            #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
             enum ComponentType {
                 #(#component_types),*
             }
