@@ -307,7 +307,7 @@ pub fn components(input: TokenStream) -> TokenStream {
                 }
             }
 
-            #[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
+            #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize)]
             pub struct FatEntity {
                 #(#fat_fields),*
             }
