@@ -187,7 +187,7 @@ pub fn components(input: TokenStream) -> TokenStream {
                 unsafe { (*(self.#renamed_ident.get())).get(id) }
             }
 
-            pub fn #renamed_ident_unwrap(&self, id: u32) -> &mut #ident {
+            pub fn #renamed_ident_unwrap(&self, id: u32) -> &#ident {
                 unsafe { (*(self.#renamed_ident.get())).get(id) }
                     .expect(#error_message)
             }
