@@ -227,6 +227,19 @@ pub fn components(input: TokenStream) -> TokenStream {
             quote! { #ident (#ident) }
         })
         .collect::<Vec<_>>();
+    let component_types_add_to_fat_entity = components
+        .s
+        .iter()
+        .map(|v| {
+            let ident = &v.ident;
+            let renamed_ident = proc_macro2::Ident::new(
+                &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
+                ident.span(),
+            );
+
+            quote! { Self::#ident (v) => { fat.#renamed_ident (v) } }
+        })
+        .collect::<Vec<_>>();
 
     quote! {
         use eliecs::{Entity, Pool};
@@ -245,6 +258,14 @@ pub fn components(input: TokenStream) -> TokenStream {
             #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
             pub enum ComponentTypeContaining {
                 #(#component_types_containing),*
+            }
+
+            impl ComponentTypeContaining {
+                pub fn add_to_fat_entity(self, fat: FatEntity) -> FatEntity {
+                    match self {
+                        #(#component_types_add_to_fat_entity),*
+                    }
+                }
             }
 
             #[derive(Default, Debug, serde::Serialize, serde::Deserialize)]

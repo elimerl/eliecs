@@ -6,6 +6,7 @@ use std::{
 
 use bincode::Options;
 use eliecs::components;
+use serde::{Deserialize, Serialize};
 
 components! {
     #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -24,6 +25,7 @@ components! {
 fn main() {
     dbg!(CName("Hello".into()));
     let mut ecs = Ecs::new();
+
     ecs.spawn(
         FatEntity::new()
             .position(CPosition {
@@ -81,8 +83,4 @@ fn main() {
             .unwrap()
             .len()
     );
-    let time = Instant::now();
-    let compressed =
-        lz4_flex::compress(&bincode::DefaultOptions::new().serialize(&ecs).unwrap()).len();
-    println!("{}", compressed);
 }
