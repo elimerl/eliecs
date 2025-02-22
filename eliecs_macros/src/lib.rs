@@ -241,6 +241,36 @@ pub fn components(input: TokenStream) -> TokenStream {
         })
         .collect::<Vec<_>>();
 
+    let spawn_per_component = components
+        .s
+        .iter()
+        .map(|v| {
+            let ident = &v.ident;
+            let renamed_ident = proc_macro2::Ident::new(
+                &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
+                ident.span(),
+            );
+
+            quote! { if let Some(v) = data.#renamed_ident {
+                self.#renamed_ident.get_mut().insert(e.id, v);
+            } }
+        })
+        .collect::<Vec<_>>();
+
+    let despawn_per_component = components
+        .s
+        .iter()
+        .map(|v| {
+            let ident = &v.ident;
+            let renamed_ident = proc_macro2::Ident::new(
+                &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
+                ident.span(),
+            );
+
+            quote! {self.#renamed_ident.get_mut().remove(e.id);}
+        })
+        .collect::<Vec<_>>();
+
     quote! {
         use eliecs::{Entity, Pool};
         use serde::{
@@ -311,13 +341,7 @@ pub fn components(input: TokenStream) -> TokenStream {
             }
             self.existence.insert(e.id, e.version);
 
-            if let Some(v) = data.position {
-                self.position.get_mut().insert(e.id, v);
-            }
-
-            if let Some(v) = data.name {
-                self.name.get_mut().insert(e.id, v);
-            }
+            #(#spawn_per_component)*
 
             e
         }
@@ -326,8 +350,7 @@ pub fn components(input: TokenStream) -> TokenStream {
             if self.is_alive(e) {
                 self.existence.remove(e.id);
 
-                self.position.get_mut().remove(e.id);
-                self.name.get_mut().remove(e.id);
+                #(#despawn_per_component)*
 
                 let mut v = e;
                 v.version = if let Some(v) = v.version.checked_add(1) {
