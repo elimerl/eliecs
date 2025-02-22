@@ -10,7 +10,7 @@ pub use pool::Pool;
 pub use eliecs_macros::components;
 use serde::{de::Visitor, ser::SerializeTuple};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Entity {
     pub id: u32,
     pub version: NonZeroU32,
