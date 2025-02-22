@@ -338,8 +338,8 @@ pub fn components(input: TokenStream) -> TokenStream {
         pub fn is_alive(&self, e: eliecs::Entity) -> bool {
             self.existence.get(e.id).copied() == Some(e.version)
         }
-        pub fn get_entity_from_id(&self, id: u32) -> Option<std::num::NonZeroU32> {
-            self.existence.get(id).copied()
+        pub fn get_entity_from_id(&self, id: u32) -> Option<Entity> {
+            Entity::new(id, self.existence.get(id).copied())
         }
         pub fn spawn(&mut self, data: FatEntity) -> eliecs::Entity {
             let e: eliecs::Entity;
