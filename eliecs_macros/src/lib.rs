@@ -295,6 +295,7 @@ pub fn components(input: TokenStream) -> TokenStream {
             }
 
             #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+            #[serde(tag = "type", content = "value")]
             pub enum ComponentTypeContaining {
                 #(#component_types_containing),*
             }
