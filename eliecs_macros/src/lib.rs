@@ -323,18 +323,20 @@ pub fn components(input: TokenStream) -> TokenStream {
         }
 
         pub fn despawn(&mut self, e: eliecs::Entity) {
-            self.existence.remove(e.id);
+            if self.is_alive(e) {
+                self.existence.remove(e.id);
 
-            self.position.get_mut().remove(e.id);
-            self.name.get_mut().remove(e.id);
+                self.position.get_mut().remove(e.id);
+                self.name.get_mut().remove(e.id);
 
-            let mut v = e;
-            v.version = if let Some(v) = v.version.checked_add(1) {
-                v
-            } else {
-                std::num::NonZeroU32::MIN
-            };
-            self.free_list.push(v);
+                let mut v = e;
+                v.version = if let Some(v) = v.version.checked_add(1) {
+                    v
+                } else {
+                    std::num::NonZeroU32::MIN
+                };
+                self.free_list.push(v);
+            }
         }
 
         #(#ecs_per_component_methods)*
