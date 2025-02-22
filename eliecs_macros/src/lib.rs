@@ -230,12 +230,12 @@ pub fn components(input: TokenStream) -> TokenStream {
 
             #tokens
 
-    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-    enum ComponentType {
-        #(#component_types),*
-    }
+            #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+            enum ComponentType {
+                #(#component_types),*
+            }
 
-            #[derive(Default, Debug)]
+            #[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
             struct FatEntity {
                 #(#fat_fields),*
             }

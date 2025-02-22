@@ -8,16 +8,16 @@ use bincode::Options;
 use eliecs::components;
 
 components! {
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     struct CPosition {
         pub x: f32,
         pub y: f32,
         pub z: f32,
     }
-    #[derive(Debug, Serialize, Deserialize)]
-        struct CName(pub String);
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct CName(pub String);
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Debug, Serialize, Deserialize, Clone)]
     struct CRot(pub f32);
 }
 
