@@ -339,7 +339,11 @@ pub fn components(input: TokenStream) -> TokenStream {
             self.existence.get(e.id).copied() == Some(e.version)
         }
         pub fn get_entity_from_id(&self, id: u32) -> Option<Entity> {
-            Entity::new(id, self.existence.get(id).copied())
+            if let Some(ver) = self.existence.get(id).copied() {
+                Some(Entity::new(id, ver))
+            } else {
+                None
+            }
         }
         pub fn spawn(&mut self, data: FatEntity) -> eliecs::Entity {
             let e: eliecs::Entity;
