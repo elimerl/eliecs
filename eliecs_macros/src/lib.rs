@@ -146,6 +146,10 @@ pub fn components(input: TokenStream) -> TokenStream {
             &(ident.to_string().strip_prefix("C").unwrap()).to_snake_case(),
             ident.span(),
         );
+        let renamed_ident_unwrap = proc_macro2::Ident::new(
+            &((ident.to_string().strip_prefix("C").unwrap()).to_snake_case() + "_unwrap"),
+            ident.span(),
+        );
         let renamed_ident_mut = proc_macro2::Ident::new(
             &((ident.to_string().strip_prefix("C").unwrap()).to_snake_case() + "_mut"),
             ident.span(),
@@ -181,6 +185,11 @@ pub fn components(input: TokenStream) -> TokenStream {
         quote! {
             pub fn #renamed_ident(&self, id: u32) -> Option<&#ident> {
                 unsafe { (*(self.#renamed_ident.get())).get(id) }
+            }
+
+            pub fn #renamed_ident_unwrap(&self, id: u32) -> &mut #ident {
+                unsafe { (*(self.#renamed_ident.get())).get(id) }
+                    .expect(#error_message)
             }
 
             pub fn #renamed_ident_mut(&self, id: u32) -> Option<&mut #ident> {
