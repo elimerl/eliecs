@@ -238,17 +238,17 @@ pub fn components(input: TokenStream) -> TokenStream {
             #tokens
 
             #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
-            enum ComponentType {
+            pub enum ComponentType {
                 #(#component_types),*
             }
 
             #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
-            enum ComponentTypeContaining {
+            pub enum ComponentTypeContaining {
                 #(#component_types_containing),*
             }
 
             #[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
-            struct FatEntity {
+            pub struct FatEntity {
                 #(#fat_fields),*
             }
 
@@ -260,7 +260,7 @@ pub fn components(input: TokenStream) -> TokenStream {
                 #(#fat_methods)*
             }
 
-            struct Ecs {
+            pub struct Ecs {
                 existence: Pool<std::num::NonZeroU32>,
                 free_list: Vec<Entity>,
                         #(#ecs_fields),*
