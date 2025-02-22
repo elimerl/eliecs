@@ -219,6 +219,14 @@ pub fn components(input: TokenStream) -> TokenStream {
             quote! { #ident }
         })
         .collect::<Vec<_>>();
+    let component_types_containing = components
+        .s
+        .iter()
+        .map(|v| {
+            let ident = &v.ident;
+            quote! { #ident (#ident) }
+        })
+        .collect::<Vec<_>>();
 
     quote! {
         use eliecs::{Entity, Pool};
@@ -232,6 +240,11 @@ pub fn components(input: TokenStream) -> TokenStream {
             #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
             enum ComponentType {
                 #(#component_types),*
+            }
+
+            #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+            enum ComponentTypeContaining {
+                #(#component_types_containing),*
             }
 
             #[derive(Default, Debug, serde::Serialize, serde::Deserialize)]
